@@ -8,13 +8,14 @@ Jupyter notebook to do the setup interactively. I try to ensure that all
 steps are achieved programmatically, in order to facilitate reproducibility.
 
 This package may rely on (and certainly does not replace) several other
-useful packages, such as:
+useful packages for working with OpenMM, including:
 
-* MDTraj
-* ParmEd
-* pdbfixer
+* [MDTraj](http://mdtraj.org)
+* [ParmEd](http://parmed.github.io/ParmEd/)
+* [pdbfixer](https://github.com/pandegroup/pdbfixer)
+* [openmmtools](https://openmmtools.readthedocs.io/)
 
-Mostly, this chains things together from those tools (and from OpenMM), and
+Mostly, this chains things together from those packages (and from OpenMM), and
 it provides a few conveniences that aren't built into any of those tools.
 
 ## Features
@@ -31,7 +32,7 @@ it provides a few conveniences that aren't built into any of those tools.
 Note that, if these features are included into other packages, the
 implementation here may be removed. This repository isn't intended to be a
 permanent project; just a central location to maintain a set of useful
-tools.
+tools that I couldn't find elsewhere.
 
 ## Installation
 
