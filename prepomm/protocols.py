@@ -19,14 +19,6 @@ import mdtraj as md
 import openmmtools
 
 
-def steps_for_duration(duration, simulation):
-    if isinstance(duration, u.Quantity):
-        return int(duration / simulation.integrator.getStepSize())
-    elif isinstace(duration, int):
-        return duration
-    else:
-        raise RuntimeError("Unable to treat duration: %s", duration)
-
 def topology_and_positions(input_data):
     """Extracts topology and positions from a wide range of inputs.
 
@@ -90,12 +82,6 @@ def make_simulation(pdbfile_or_mdtraj, ff_models, integrator=None,
 def make_modeller(pdbfile_or_mdtraj):
     return app.Modeller(*_topology_and_positions(pdbfile_or_mdtraj))
 
-def simulation_write_pdb(simulation, pdb_outfile):
-    """Write out the current state of the simulation as a PDB"""
-    positions = simulation.context.getState(getPositions=True).getPositions()
-    with open(pdb_outfile, 'w') as pdb_out:
-        app.PDBFile.writeFile(simulation.topology, positions, pdb_out)
-
 def minimize_vacuum(input_setup, ff_models, integrator=None):
     modeller = make_modeller(input_setup)
     forcefield = mm.app.ForceField(*ff_models)
@@ -139,9 +125,11 @@ def addH_and_solvate(input_setup, ff_models, box_vectors=None):
     print('Done')
     return simulation
 
+
 # TODO: add position_constrained, equilibrate_nvt, equilibrate_npt
 def run_position_constrained(simulation, constrained_atoms, duration):
     pass
+
 
 def default_nvt_simulation(simulation, temperature=300.0*u.kelvin):
     integrator = openmmtools.integrators.VVVRIntegrator(
@@ -154,6 +142,10 @@ def default_nvt_simulation(simulation, temperature=300.0*u.kelvin):
                              simulation.system,
                              integrator)
     new_sim.context.setPositions(positions)
+    if isinstance(simulation, app.Simulation):
+        state = simulation.context.getState(getVelocities=True)
+        velocities = state.getVelocities()
+        new_sim.context.setVelocities(velocities)
     return new_sim
 
 
@@ -164,24 +156,13 @@ def default_npt_simulation(simulation, temperature=300*u.kelvin,
         collision_rate=1.0 / ps,
         timestep=0.002 * ps
     )
-    topology, positions = _topology_and_positions(simulation)
     system = copy.copy(simulation.system)
-    system.addForce(mm.MonteCarloBarostat_Temperature(pressure,
-                                                      temperature,
-                                                      25))
+    system.addForce(mm.MonteCarloBarostat(pressure, temperature, 25))
+    topology, positions = _topology_and_positions(simulation)
     new_sim = app.Simulation(topology, system, integrator)
     new_sim.context.setPositions(positions)
+    if isinstance(simulation, app.Simulation):
+        state = simulation.context.getState(getVelocities=True)
+        velocities = state.getVelocities()
+        new_sim.context.setVelocities(velocities)
     return new_sim
-
-
-def simulation_to_mdtraj(simulation):
-    topology, positions = _topology_and_positions(simulation)
-    md_topology = md.Topology.from_openmm(topology)
-    xyz = np.array([positions.value_in_unit(nm)])
-    trajectory = md.Trajectory(xyz, topology)  # TODO unitcells
-    return trajectory
-    # with tempfile.NamedTemporaryFile(suffix=".pdb") as tmp:
-        # app.PDBFile.writeFile(topology, positions, tmp)
-        # trajectory = md.load(tmp.name)
-    return trajectory
-
