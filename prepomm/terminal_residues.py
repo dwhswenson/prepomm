@@ -7,7 +7,7 @@ def get_5prime_phosphate(topology, chainid):
     return phosphate_5prime
 
 
-def remove_5prime_phosphorus(trajectory, chains):
+def remove_5prime_phosphate(trajectory, chains):
     topology = trajectory.topology
     fiveprime_phosphates = set(sum([get_5prime_phosphate(topology, chain)
                                     for chain in chains], []))
