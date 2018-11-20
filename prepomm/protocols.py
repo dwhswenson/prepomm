@@ -5,11 +5,14 @@ situations, just in some common ones.
 """
 
 from __future__ import print_function
+import sys
 import os
 import tempfile
 import collections
 import copy
+
 import numpy as np
+
 import simtk.openmm as mm
 import simtk.openmm.app as app
 from simtk.unit import nanometer as nm
@@ -17,6 +20,36 @@ from simtk.unit import picosecond as ps
 import simtk.unit as u
 import mdtraj as md
 import openmmtools
+import parmed
+
+from .tools import steps_for_duration
+
+def default_equilibration_reporters(simulation, base_name):
+    interval = steps_for_duration(1.0*ps, simulation)
+    traj_reporter = md.reporters.DCDReporter(base_name + "_equil.dcd",
+                                             interval)
+    state_data = app.StateDataReporter(
+        base_name + "_equil.csv",
+        interval,
+        time=True,
+        potentialEnergy=True,
+        kineticEnergy=True,
+        temperature=True,
+        volume=True,
+        density=True,
+        speed=True
+    )
+    progress = app.StateDataReporter(
+        sys.stdout,
+        interval,
+        time=True,
+        potentialEnergy=True,
+        temperature=True,
+        volume=True,
+        speed=True,
+        elapsedTime=True
+    )
+    return [traj_reporter, state_data, progress]
 
 
 def topology_and_positions(input_data):
@@ -53,8 +86,8 @@ def topology_and_positions(input_data):
             elif os.path.isfile(input_data):
                 pdb = app.PDBFile(input_data)
                 return pdb.topology, pdb.positions
-            else:
-                return topology, positions
+        else:
+            return topology, positions
     # only reach here if nothing else worked
     raise RuntimeError("Unknown input %s. Not md.Trajecory or filename.",
                        input_data)
@@ -126,7 +159,7 @@ def addH_and_solvate(input_setup, ff_models, box_vectors=None):
     return simulation
 
 
-# TODO: add position_constrained, equilibrate_nvt, equilibrate_npt
+# TODO: add position_constrained
 def run_position_constrained(simulation, constrained_atoms, duration):
     pass
 
