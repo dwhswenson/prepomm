@@ -19,6 +19,6 @@ def padded_dodecahedral_box(input_info, padding, verbose=True):
     traj = tools._traj_from_file_or_traj(input_info)
     base_size = max_atom_distance(traj)
     if verbose:
-        print(base_size)
+        print("Max atom distance: " + str(base_size))
     box_vectors = dodecahedral_box_vectors(base_size, padding)
     return box_vectors

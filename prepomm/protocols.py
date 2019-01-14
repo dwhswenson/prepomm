@@ -24,12 +24,32 @@ import parmed
 
 from .tools import steps_for_duration
 
-def default_equilibration_reporters(simulation, base_name):
+def default_integrator(temperature):
+    if isinstance(temperature, mm.Integrator):
+        integrator = temperature
+        temperature = integrator.getTemperature()
+    else:
+        integrator = openmmtools.integrators.VVVRIntegrator(
+            temperature=temperature,
+            collision_rate=1.0 / ps,
+            timestep=0.002 * ps
+        )
+    return integrator, temperature
+
+def default_barostat(pressure, temperature):
+    if isinstance(pressure, mm.Force):
+        barostat = pressure
+    else:
+        barostat = mm.MonteCarloBarostat(pressure, temperature, 25)
+    return barostat
+
+
+def default_equilibration_reporters(simulation, base_name, infix="_equil"):
     interval = steps_for_duration(1.0*ps, simulation)
-    traj_reporter = md.reporters.DCDReporter(base_name + "_equil.dcd",
+    traj_reporter = md.reporters.DCDReporter(base_name + infix + ".dcd",
                                              interval)
     state_data = app.StateDataReporter(
-        base_name + "_equil.csv",
+        base_name + infix + ".csv",
         interval,
         time=True,
         potentialEnergy=True,
@@ -165,11 +185,8 @@ def run_position_constrained(simulation, constrained_atoms, duration):
 
 
 def default_nvt_simulation(simulation, temperature=300.0*u.kelvin):
-    integrator = openmmtools.integrators.VVVRIntegrator(
-        temperature=temperature,
-        collision_rate=1.0 / ps,
-        timestep=0.002 * ps
-    )
+    # note that temperature can also be an integrator
+    integrator, temperature = default_integrator(temperature)
     topology, positions = _topology_and_positions(simulation)
     new_sim = app.Simulation(topology,
                              simulation.system,
@@ -184,13 +201,10 @@ def default_nvt_simulation(simulation, temperature=300.0*u.kelvin):
 
 def default_npt_simulation(simulation, temperature=300*u.kelvin,
                            pressure=1*u.atmosphere):
-    integrator = openmmtools.integrators.VVVRIntegrator(
-        temperature=temperature,
-        collision_rate=1.0 / ps,
-        timestep=0.002 * ps
-    )
+    integrator, temperature = default_integrator(temperature)
+    barostat = default_barostat(pressure, temperature)
     system = copy.copy(simulation.system)
-    system.addForce(mm.MonteCarloBarostat(pressure, temperature, 25))
+    system.addForce(barostat)
     topology, positions = _topology_and_positions(simulation)
     new_sim = app.Simulation(topology, system, integrator)
     new_sim.context.setPositions(positions)
@@ -199,3 +213,14 @@ def default_npt_simulation(simulation, temperature=300*u.kelvin,
         velocities = state.getVelocities()
         new_sim.context.setVelocities(velocities)
     return new_sim
+
+
+def run_equilibration(simulation, duration, file_basename, reporters=None):
+    n_steps = steps_for_duration(duration, simulation)
+    if reporters is None:
+        reporters = default_equilibration_reporters(simulation,
+                                                    file_basename)
+    simulation.reporters.extend(reporters)
+    simulation.step(n_steps)
+    return simulation
+
