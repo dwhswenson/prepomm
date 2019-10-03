@@ -180,8 +180,22 @@ def addH_and_solvate(input_setup, ff_models, box_vectors=None):
 
 
 # TODO: add position_constrained
-def run_position_constrained(simulation, constrained_atoms, duration):
-    pass
+def run_position_constrained(simulation, constrained_atoms, duration,
+                             file_basename, temperature=300.0*u.kelvin,
+                             reporters=None):
+    pos_const_sim = default_nvt_simulation(simulation, temperature)
+    system = pos_const_sim.system
+    old_masses = {atom_idx: system.getParticleMass(atom_idx)
+                  for atom_idx in constrained_atoms}
+    for atom_idx in constrained_atoms:
+        system.setParticleMass(atom_idx, 0.0)
+
+    out_sim = run_equilibration(pos_const_sim, duraction, file_basename,
+                                reporters)
+    system = out_sim.system
+    for (atom_idx, mass) in old_masses.items():
+        system.setParticleMass(atom_idx, mass)
+    return out_sim
 
 
 def default_nvt_simulation(simulation, temperature=300.0*u.kelvin):
