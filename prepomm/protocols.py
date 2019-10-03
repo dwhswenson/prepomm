@@ -146,7 +146,7 @@ def minimize_vacuum(input_setup, ff_models, integrator=None):
     return simulation
 
 
-def addH_and_solvate(input_setup, ff_models, box_vectors=None):
+def addH_and_solvate(input_setup, ff_models, box_vectors=None, **kwargs):
     # TODO: add more options for addHydrogens and addSolvent
     """
     This is largely stolen from the OpenMM docs, Example 5-2
@@ -157,14 +157,23 @@ def addH_and_solvate(input_setup, ff_models, box_vectors=None):
     modeller = app.Modeller(*args)
     forcefield = app.ForceField(*ff_models)
     print('Adding hydrogens...')
-    modeller.addHydrogens(forcefield)
+    add_hydrogens_keywords = ['pH', 'variants', 'platform']
+    add_hydrogens_kwargs = {k: v for k, v in kwargs.items()
+                            if k in add_hydrogens_keywords}
+    modeller.addHydrogens(forcefield, **add_hydrogens_kwargs)
     print('Adding solvent...')
+    add_solvent_keywords = [
+        'positiveIon', 'negativeIon', 'ionicStrength', 'neutralize'
+    ]
+    solvent_kwargs = {k: v for k, v in kwargs.items()
+                      if k in add_solvent_keywords}
     if box_vectors:
         print("... using box vectors provided:", box_vectors)
-        solvent_kwargs = {'boxVectors': box_vectors}
+        solvent_kwargs.update({'boxVectors': box_vectors})
     else:
         print("... using cubic box with 1 nm padding")
-        solvent_kwargs = {'padding': 1*nm}
+        solvent_kwargs.update({'padding': 1*nm})
+
     modeller.addSolvent(forcefield, model=ff_models.water_model,
                         **solvent_kwargs)
     print(modeller.topology)
