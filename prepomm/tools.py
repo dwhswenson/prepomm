@@ -33,6 +33,23 @@ def simulation_write_pdb(simulation, pdb_outfile):
         app.PDBFile.writeFile(simulation.topology, positions, pdb_out)
 
 
+def simulation_serialize_parts(simulation, basename):
+    def serialize_part(part, part_name):
+        with open(basename + '_' + part_name + '.xml', 'w') as f:
+            f.write(mm.XmlSerializer.serialize(part))
+
+    serialize_part(simulation.system, 'sys')
+    serialize_part(simulation.integrator, 'integ')
+    simulation.saveState(basename + '_state.xml')
+
+def simulation_from_parts(basename, pdb):
+    topology = mm.app.PDBFile(pdb).topology
+    system = basename + '_sys.xml'
+    integrator = basename + '_integ.xml'
+    state = basename + '_state.xml'
+    return mm.app.Simulation(topology, system, integrator, state=state)
+
+
 def simulation_to_mdtraj(simulation):
     topology, positions = _topology_and_positions(simulation)
     md_topology = md.Topology.from_openmm(topology)
