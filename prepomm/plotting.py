@@ -28,7 +28,8 @@ def plot_pt_equilibration(csv_or_pandas, simulation, pressure_label='volume'):
 
     (fig, ax1) = plt.subplots()
 
-    temp_line = ax1.plot(time, temp, color=temperature_color)
+    temp_line = ax1.plot(time, temp, color=temperature_color,
+                         label=temp_column)
     expected_temp_line = ax1.plot(time, [expected] * len(time),
                                   color=temperature_color, ls='--',
                                   label=expected_label)
@@ -41,7 +42,7 @@ def plot_pt_equilibration(csv_or_pandas, simulation, pressure_label='volume'):
     ax1.tick_params('y', colors=temperature_color)
 
     ax2 = ax1.twinx()
-    box_line = ax2.plot(time, box, color=box_color)
+    box_line = ax2.plot(time, box, color=box_color, label=box_column)
     ax2.set_ylabel(box_column)
     ax2.tick_params('y', colors=box_color)
 
