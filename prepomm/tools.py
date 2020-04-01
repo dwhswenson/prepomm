@@ -4,9 +4,17 @@ Tools used elsewhere in this package
 import os
 import collections
 import mdtraj as md
+
 from simtk import openmm as mm
 from simtk.openmm import app
 from simtk import unit as u
+
+try:
+    import openmmtools
+except ImportError:
+    HAS_OPENMMTOOLS = False
+else:
+    HAS_OPENMMTOOLS = True
 
 def _traj_from_file_or_traj(file_or_traj):
     if isinstance(file_or_traj, md.Trajectory):
@@ -47,7 +55,11 @@ def simulation_from_parts(basename, pdb):
     system = basename + '_sys.xml'
     integrator = basename + '_integ.xml'
     state = basename + '_state.xml'
-    return mm.app.Simulation(topology, system, integrator, state=state)
+    sim = mm.app.Simulation(topology, system, integrator, state=state)
+    if HAS_OPENMMTOOLS:
+        integ = sim.integrator
+        openmmtools.utils.RestorableOpenMMObject.restore_interface(integ)
+    return sim
 
 
 def simulation_to_mdtraj(simulation):
