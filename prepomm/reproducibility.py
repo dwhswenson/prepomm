@@ -54,7 +54,7 @@ def reproducibility_string():
     conda_list = get_conda_list()
     dev_packages = get_development_package_versions(conda_list)
     dev_package_list = dev_package_versions_string(dev_packages)
-    return ('\n'.join(timestamp + conda_list + dev_packages))
+    return ('\n'.join(timestamp + conda_list + dev_package_list))
 
 if __name__ == "__main__":
     print(reproducibility_string())

@@ -24,6 +24,46 @@ import parmed
 
 from .tools import steps_for_duration
 
+class freeze_atoms(object):
+    """Context manager to constrain atoms (by setting mass to 0)
+    """
+    def __init__(self, system, frozen_atoms):
+        self.system = system
+        self.frozen_atoms = [int(a) for a in frozen_atoms]
+        self.stored_masses = None
+
+    def __enter__(self):
+        # store the correct masses
+        n_particles = self.system.getNumParticles()
+        self.stored_masses = [self.system.getParticleMass(i)
+                              for i in range(n_particles)]
+
+        # set frozen atom masses to 0
+        for atom_idx in self.frozen_atoms:
+            self.system.setParticleMass(atom_idx, 0.0 * u.amu)
+
+    def __exit__(self, *exc_args):
+        for i, mass in enumerate(self.stored_masses):
+            self.system.setParticleMass(i, mass)
+
+
+def validate_change(before, after, frozen_atoms):
+    """Check that a change occurred; before and after should be mdtraj"""
+    assert not np.allclose(before.xyz, after.xyz), \
+         "No changes when change was expected"
+
+    for atom in frozen_atoms:
+        assert np.allclose(before.xyz[0][atom], after.xyz[0][atom]), \
+            "Frozen atoms do not keep their locations"
+
+    for before_a, after_a in zip(before.topology.atoms, after.topology.atoms):
+        assert before_a.residue.index == after_a.residue.index, \
+            "Residue indices do not match"
+        assert before_a.residue.name == after_a.residue.name, \
+            "Residue names do not match"
+        assert before_a.name == after_a.name, "Atom names do not match"
+
+
 def default_integrator(temperature):
     if isinstance(temperature, mm.Integrator):
         integrator = temperature
@@ -117,10 +157,14 @@ _topology_and_positions = topology_and_positions
 _modeller_args = _topology_and_positions
 
 def make_simulation(pdbfile_or_mdtraj, ff_models, integrator=None,
-                    platform=None, platform_properties=None):
+                    platform=None, platform_properties=None,
+                    is_periodic=None):
     topology, positions = _topology_and_positions(pdbfile_or_mdtraj)
     forcefield = app.ForceField(*ff_models)
-    if topology.getPeriodicBoxVectors():
+    if is_periodic is None:
+        is_periodic = topology.getPeriodicBoxVectors()
+
+    if is_periodic:
         nonbonded=app.PME
     else:
         nonbonded=app.NoCutoff
@@ -135,23 +179,31 @@ def make_simulation(pdbfile_or_mdtraj, ff_models, integrator=None,
 def make_modeller(pdbfile_or_mdtraj):
     return app.Modeller(*_topology_and_positions(pdbfile_or_mdtraj))
 
-def minimize_vacuum(input_setup, ff_models, integrator=None):
+def minimize_vacuum(input_setup, ff_models, integrator=None,
+                    constrained_atoms=None):
+    if constrained_atoms is None:
+        constrained_atoms = []
     modeller = make_modeller(input_setup)
     forcefield = mm.app.ForceField(*ff_models)
     modeller.addHydrogens(forcefield)
     simulation = make_simulation((modeller.topology, modeller.positions),
                                  ff_models,
-                                 integrator)
-    simulation.minimizeEnergy()
+                                 integrator,
+                                 is_periodic=False)
+    with freeze_atoms(simulation.system, constrained_atoms):
+        simulation.minimizeEnergy()
     return simulation
 
 
-def addH_and_solvate(input_setup, ff_models, box_vectors=None, **kwargs):
+def addH_and_solvate(input_setup, ff_models, box_vectors=None,
+                     constrained_atoms=None, **kwargs):
     # TODO: add more options for addHydrogens and addSolvent
     """
     This is largely stolen from the OpenMM docs, Example 5-2
     (http://docs.openmm.org/latest/userguide/application.html#saving-the-results)
     """
+    if constrained_atoms is None:
+        constrained_atoms = []
     print('Loading...')
     args = _modeller_args(input_setup)
     modeller = app.Modeller(*args)
@@ -183,7 +235,8 @@ def addH_and_solvate(input_setup, ff_models, box_vectors=None, **kwargs):
     integrator = mm.VerletIntegrator(0.001*ps)
     simulation = app.Simulation(modeller.topology, system, integrator)
     simulation.context.setPositions(modeller.positions)
-    simulation.minimizeEnergy(maxIterations=100)
+    with freeze_atoms(simulation.system, constrained_atoms):
+        simulation.minimizeEnergy(maxIterations=100)
     print('Done')
     return simulation
 
